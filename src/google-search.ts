@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -170,7 +171,7 @@ class GoogleSearchServer {
     }
 
     try {
-      const response = await axios.post<SearchResponse>('http://localhost:5000/search', {
+      const response = await axios.post<SearchResponse>('http://localhost:5001/search', {
         query: args.query,
         num_results: args.num_results || 5,
       });

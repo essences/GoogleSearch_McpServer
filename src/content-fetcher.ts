@@ -4,7 +4,7 @@ import { WebpageContent, WebpageAnalysisResponse } from './types.js';
 export class ContentFetcher {
   private readonly baseUrl: string;
 
-  constructor(port: number = 5001) {
+  constructor(port: number = 5002) {
     this.baseUrl = `http://localhost:${port}`;
   }
 

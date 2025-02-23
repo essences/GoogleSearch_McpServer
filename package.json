@@ -3,11 +3,18 @@
   "version": "0.1.0",
   "description": "MCP server for Google search and webpage analysis",
   "type": "module",
+  "main": "build/google-search.js",
+  "bin": {
+    "google-search-mcp": "./build/google-search.js"
+  },
+  "files": [
+    "build"
+  ],
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/google-search.js",
+    "build": "tsc && chmod 755 build/google-search.js",
+    "start": "node build/google-search.js",
     "dev": "tsc -w",
-    "start:python": "concurrently \"python google_search.py\" \"python link_view.py\"",
+    "start:python": "concurrently \"python3 google_search.py\" \"python3 link_view.py\"",
     "start:all": "concurrently \"npm run start:python\" \"npm run start\""
   },
   "dependencies": {
