@@ -216,7 +216,7 @@ class GoogleSearchServer {
     }
 
     try {
-      const response = await axios.post<SearchResponse>('http://localhost:5000/search', {
+      const response = await axios.post<SearchResponse>('http://localhost:5002/search', {
         query: args.query,
         num_results: args.num_results || 5,
         date_restrict: args.date_restrict,
