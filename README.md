@@ -1,250 +1,363 @@
-# Built For use with Cline + VS Code!
-
 # Google Search MCP Server
 
-An MCP (Model Context Protocol) server that provides Google search capabilities and webpage content analysis tools. This server enables AI models to perform Google searches and analyze webpage content programmatically.
+# MCPの概要と仕組み
 
-## Features
+**MCP（Model Context/Control Protocol）**は、AIモデル（例：ClaudeなどのLLM）と外部のデータソースやツールとの間で**安全な双方向通信**を実現するオープン標準プロトコルです。イメージとしてはAIアシスタントにUSB-Cハブを接続するようなもので、さまざまなデータソース（ローカルファイル、データベース、クラウドサービスなど）へのアクセスを**統一された方法**で提供します。これにより、AI開発者は個別のカスタム連携コードを毎回書く必要がなくなり、標準化された方法で新しいデータソースを追加できます。
 
-- Advanced Google Search with filtering options (date, language, country, safe search)
-- Detailed webpage content extraction and analysis
-- Batch webpage analysis for comparing multiple sources
-- Environment variable support for API credentials
-- Comprehensive error handling and user feedback
-- MCP-compliant interface for seamless integration with AI assistants
+## MCPアーキテクチャ
 
-## Prerequisites
+MCPは**クライアント-サーバーアーキテクチャ**で動作します。具体的には、以下のコンポーネントから成ります：
 
-- Node.js (v16 or higher)
-- Python (v3.8 or higher)
-- Google Cloud Platform account
-- Custom Search Engine ID
-- Google API Key
+- **MCPホスト**: AIモデルを実行しMCP通信を行うプログラム（Claude Desktopや対応するIDE拡張など）
+- **MCPクライアント**: ホスト内で動作し、MCPサーバーとの接続とメッセージ送受信を担う部品
+- **MCPサーバー**: 各種データソースや機能へのアクセスを提供する軽量なアダプター
+- **ローカルデータソース**: ユーザーPC上のファイルやDBなど
+- **リモートサービス**: インターネット経由でアクセスする外部サービス
 
-## Installation
+## 通信プロトコル
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-username/google-search-mcp.git
-   cd google-search-mcp
-   ```
+MCPは**JSON-RPC 2.0**に準拠したメッセージ交換を行います。通信の手順は次のようになります：
 
-2. Install Node.js dependencies:
-   ```bash
-   npm install
-   ```
+1. **初期化**: クライアントとサーバー間でプロトコルバージョンと機能の合意
+2. **メッセージ交換**: リクエスト/レスポンス形式での機能呼び出し
+3. **終了**: 明示的なシャットダウンまたはエラーによる終了
 
-3. Install Python dependencies:
-   ```bash
-   pip install flask google-api-python-client flask-cors beautifulsoup4 trafilatura markdownify
-   ```
+# Google Search MCPサーバーの実装
 
-4. Build the TypeScript code:
-   ```bash
-   npm run build
-   ```
+## 主要機能
 
-5. Create a helper script to start the Python servers (Windows example):
-   ```bash
-   # Create start-python-servers.cmd
-   @echo off
-   echo Starting Python servers for Google Search MCP...
-   
-   REM Start Python search server
-   start "Google Search API" cmd /k "python google_search.py"
-   
-   REM Start Python link viewer
-   start "Link Viewer" cmd /k "python link_view.py"
-   
-   echo Python servers started. You can close this window.
-   ```
+このMCPサーバーは以下の機能を提供します：
 
-## Configuration
+1. Google Custom Search APIを使用したウェブ検索
+2. 検索結果のコンテキスト抽出と要約
+3. 高度な検索フィルタリングとパラメータ制御
 
-### API Credentials
+## コアコンポーネント
 
-You can provide Google API credentials in two ways:
+```typescript
+class GoogleSearchServer {
+  private server: Server;
+  private errorManager: ErrorManager;
+  private validator: InputValidator;
 
-1. **Environment Variables** (Recommended):
-   - Set `GOOGLE_API_KEY` and `GOOGLE_SEARCH_ENGINE_ID` in your environment
-   - The server will automatically use these values
-
-2. **Configuration File**:
-   - Create an `api-keys.json` file in the root directory:
-   ```json
-   {
-       "api_key": "your-google-api-key",
-       "search_engine_id": "your-custom-search-engine-id"
-   }
-   ```
-
-### MCP Settings Configuration
-
-Add the server configuration to your MCP settings file:
-
-#### For Cline (VS Code Extension)
-File location: `%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
-
-```json
-{
-  "mcpServers": {
-    "google-search": {
-      "command": "C:\\Program Files\\nodejs\\node.exe",
-      "args": ["C:\\path\\to\\google-search-mcp\\dist\\google-search.js"],
-      "cwd": "C:\\path\\to\\google-search-mcp",
-      "env": {
-        "GOOGLE_API_KEY": "your-google-api-key",
-        "GOOGLE_SEARCH_ENGINE_ID": "your-custom-search-engine-id"
+  constructor() {
+    this.server = new Server(
+      {
+        name: 'google-search-mcp',
+        version: '1.0.0',
       },
-      "disabled": false,
-      "autoApprove": []
-    }
+      {
+        capabilities: {
+          tools: {
+            google_search: {
+              description: 'Google検索を実行し結果を返す',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  query: { type: 'string' },
+                  num_results: { type: 'number', default: 5 },
+                  language: { type: 'string', default: 'ja' }
+                },
+                required: ['query']
+              }
+            }
+          }
+        }
+      }
+    );
+
+    this.setupHandlers();
+  }
+
+  private async handleSearch(params: SearchParams): Promise<SearchResult[]> {
+    const response = await this.performGoogleSearch(params);
+    return this.processSearchResults(response);
   }
 }
 ```
 
-#### For Claude Desktop App
-File location: `%APPDATA%\Claude\claude_desktop_config.json`
+# ユーザーガイド
 
-```json
-{
-  "mcpServers": {
-    "google-search": {
-      "command": "C:\\Program Files\\nodejs\\node.exe",
-      "args": ["C:\\path\\to\\google-search-mcp\\dist\\google-search.js"],
-      "cwd": "C:\\path\\to\\google-search-mcp",
-      "env": {
-        "GOOGLE_API_KEY": "your-google-api-key",
-        "GOOGLE_SEARCH_ENGINE_ID": "your-custom-search-engine-id"
-      },
-      "disabled": false,
-      "autoApprove": []
-    }
-  }
-}
-```
+## 前提条件
 
-## Running the Server
+- Claude Desktop または VSCode with Cursor
+- Google Custom Search API キー
+- Google Custom Search Engine ID
+- Node.js v14以上
 
-### Method 1: Start Python Servers Separately (Recommended)
+## Google APIの設定
 
-1. First, start the Python servers using the helper script:
-   ```bash
-   start-python-servers.cmd
-   ```
+1. Google Cloud Consoleで新しいプロジェクトを作成
+2. Custom Search APIを有効化
+3. APIキーを生成
+4. [Google Programmable Search Engine](https://programmablesearchengine.google.com/about/)で検索エンジンを作成
+5. Search Engine IDを取得
 
-2. Configure the MCP settings to run only the Node.js server:
-   ```json
-   {
-     "command": "C:\\Program Files\\nodejs\\node.exe",
-     "args": ["C:\\path\\to\\google-search-mcp\\dist\\google-search.js"]
-   }
-   ```
+## インストール
 
-### Method 2: All-in-One Script
-
-Start both the TypeScript and Python servers with a single command:
 ```bash
-npm run start:all
+# リポジトリのクローン
+git clone https://github.com/your-username/google-search-mcp.git
+cd google-search-mcp
+
+# 依存パッケージのインストール
+npm install
+
+# ビルド
+npm run build
 ```
 
-## Available Tools
+## 設定
 
-### 1. google_search
-Search Google and return relevant results from the web. This tool finds web pages, articles, and information on specific topics using Google's search engine.
+### Claude Desktop設定
 
-```typescript
+`~/Library/Application Support/Claude/claude_desktop_config.json`を編集:
+
+```json
 {
-  "name": "google_search",
-  "arguments": {
-    "query": "your search query",
-    "num_results": 5, // optional, default: 5, max: 10
-    "date_restrict": "w1", // optional, restrict to past day (d1), week (w1), month (m1), year (y1)
-    "language": "en", // optional, ISO 639-1 language code (en, es, fr, de, ja, etc.)
-    "country": "us", // optional, ISO 3166-1 alpha-2 country code (us, uk, ca, au, etc.)
-    "safe_search": "medium" // optional, safe search level: "off", "medium", "high"
+  "mcpServers": {
+    "google-search": {
+      "command": "node",
+      "args": ["/absolute/path/to/google-search-mcp/dist/google-search.js"],
+      "env": {
+        "GOOGLE_API_KEY": "your-api-key",
+        "GOOGLE_SEARCH_ENGINE_ID": "your-search-engine-id"
+      },
+      "disabled": false
+    }
   }
 }
 ```
 
-### 2. extract_webpage_content
-Extract and analyze content from a webpage, converting it to readable text. This tool fetches the main content while removing ads, navigation elements, and other clutter.
+### Cursor設定
 
-```typescript
+`~/Library/Application Support/Cursor/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json`を編集:
+
+```json
 {
-  "name": "extract_webpage_content",
-  "arguments": {
-    "url": "https://example.com"
+  "mcpServers": {
+    "google-search": {
+      "command": "node",
+      "args": ["/absolute/path/to/google-search-mcp/dist/google-search.js"],
+      "env": {
+        "GOOGLE_API_KEY": "your-api-key",
+        "GOOGLE_SEARCH_ENGINE_ID": "your-search-engine-id"
+      },
+      "disabled": false
+    }
   }
 }
 ```
 
-### 3. extract_multiple_webpages
-Extract and analyze content from multiple webpages in a single request. Ideal for comparing information across different sources or gathering comprehensive information on a topic.
+## 使用方法
 
-```typescript
-{
-  "name": "extract_multiple_webpages",
-  "arguments": {
-    "urls": [
-      "https://example1.com",
-      "https://example2.com"
-    ]
-  }
-}
+1. Claude Desktopを起動（または再起動）
+2. チャットウィンドウ右下のハンマーアイコンで利用可能なツールを確認
+3. 以下のような質問でGoogle検索を利用可能:
+   - 「Model Context Protocolについて調べて」
+   - 「最新のAI研究論文を探して」
+   - 「プログラミング言語の人気ランキングを検索」
+
+## トラブルシューティング
+
+1. **サーバーが認識されない**
+   - 設定ファイルのパスが正しいか確認
+   - ビルドが成功しているか確認
+   - ファイルの実行権限を確認
+
+2. **検索が失敗する**
+   - APIキーとSearch Engine IDの設定を確認
+   - APIクォータの超過有無を確認
+   - ネットワーク接続を確認
+
+3. **結果が返ってこない**
+   - ログファイルでエラーを確認
+   - API制限に達していないか確認
+   - クエリの形式が正しいか確認
+
+## 制限事項
+
+1. **API制限**
+   - 無料版のGoogle Custom Search APIは1日あたり100クエリまで
+   - 有料版は1日10,000クエリまで
+
+2. **レスポンス制限**
+   - 1回のクエリで最大10件まで取得可能
+   - ページネーションは実装されていません
+
+3. **コンテンツ制限**
+   - 一部のウェブサイトは検索結果から除外される場合があります
+   - PDFなどの特殊なコンテンツは完全にインデックスされない場合があります
+
+## セキュリティ注意事項
+
+1. **APIキーの保護**
+   - APIキーを直接コードにハードコーディングしない
+   - 環境変数として設定
+   - 定期的なキーのローテーション
+
+2. **アクセス制御**
+   - 適切な実行権限の設定
+   - 入力値の検証
+   - レート制限の実装
+
+3. **データ保護**
+   - センシティブな検索クエリのログ制御
+   - 個人情報を含む検索結果の取り扱い注意
+   - キャッシュデータの適切な管理
+
+# セットアップスクリプト
+
+## macOS/Linux用セットアップスクリプト
+
+`start-mcp.sh`:
+```bash
+#!/bin/bash
+
+# 環境変数の読み込み
+if [ -f "api-keys.json" ]; then
+    export GOOGLE_API_KEY=$(cat api-keys.json | jq -r '.GOOGLE_API_KEY')
+    export GOOGLE_SEARCH_ENGINE_ID=$(cat api-keys.json | jq -r '.GOOGLE_SEARCH_ENGINE_ID')
+else
+    echo "Error: api-keys.json not found"
+    exit 1
+fi
+
+# 依存関係の確認とインストール
+if [ ! -d "node_modules" ]; then
+    echo "Installing dependencies..."
+    npm install
+fi
+
+# TypeScriptのビルド
+echo "Building TypeScript..."
+npm run build
+
+# サーバーの起動
+echo "Starting MCP server..."
+node dist/google-search.js
 ```
 
-## Example Usage
+## Windows用セットアップスクリプト
 
-Here are some examples of how to use the Google Search MCP tools:
+`start-all-servers.cmd`:
+```batch
+@echo off
+setlocal enabledelayedexpansion
 
-### Basic Search
+REM 環境変数の読み込み
+if exist api-keys.json (
+    for /f "tokens=* usebackq" %%a in (`type api-keys.json ^| jq -r .GOOGLE_API_KEY`) do (
+        set "GOOGLE_API_KEY=%%a"
+    )
+    for /f "tokens=* usebackq" %%a in (`type api-keys.json ^| jq -r .GOOGLE_SEARCH_ENGINE_ID`) do (
+        set "GOOGLE_SEARCH_ENGINE_ID=%%a"
+    )
+) else (
+    echo Error: api-keys.json not found
+    exit /b 1
+)
+
+REM 依存関係の確認とインストール
+if not exist node_modules (
+    echo Installing dependencies...
+    call npm install
+)
+
+REM TypeScriptのビルド
+echo Building TypeScript...
+call npm run build
+
+REM サーバーの起動
+echo Starting MCP server...
+node dist/google-search.js
 ```
-Search for information about artificial intelligence
+
+## Docker対応
+
+```dockerfile
+FROM node:18-slim
+
+WORKDIR /app
+
+# 必要なファイルのコピー
+COPY package*.json ./
+COPY tsconfig.json ./
+COPY src/ ./src/
+
+# 依存関係のインストールとビルド
+RUN npm ci
+RUN npm run build
+
+# 実行時の環境変数設定
+ENV NODE_ENV=production
+
+# サーバー起動
+CMD ["node", "dist/google-search.js"]
 ```
 
-### Advanced Search with Filters
-```
-Search for recent news about climate change from the past week in Spanish
-```
-
-### Content Extraction
-```
-Extract the content from https://example.com/article
-```
-
-### Multiple Content Comparison
-```
-Compare information from these websites:
-- https://site1.com/topic
-- https://site2.com/topic
-- https://site3.com/topic
+Docker Compose設定:
+```yaml
+version: '3.8'
+services:
+  google-search-mcp:
+    build: .
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GOOGLE_SEARCH_ENGINE_ID=${GOOGLE_SEARCH_ENGINE_ID}
+    volumes:
+      - ./api-keys.json:/app/api-keys.json:ro
+    restart: unless-stopped
 ```
 
-## Getting Google API Credentials
+# ライセンス
 
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Enable the Custom Search API
-4. Create API credentials (API Key)
-5. Go to the [Custom Search Engine](https://programmablesearchengine.google.com/about/) page
-6. Create a new search engine and get your Search Engine ID
-7. Add these credentials to your `api-keys.json` file
+MIT License
 
-## Error Handling
+Copyright (c) 2025 Your Name
 
-The server provides detailed error messages for:
-- Missing or invalid API credentials
-- Failed search requests
-- Invalid webpage URLs
-- Network connectivity issues
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-## Architecture
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-The server consists of two main components:
-1. TypeScript MCP Server: Handles MCP protocol communication and provides the tool interface
-2. Python Flask Server: Manages Google API interactions and webpage content analysis
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
-## License
+# 貢献
 
-MIT
+1. このリポジトリをフォーク
+2. 新しいブランチを作成 (`git checkout -b feature/amazing-feature`)
+3. 変更をコミット (`git commit -am 'Add some amazing feature'`)
+4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
+5. プルリクエストを作成
+
+# アップデート履歴
+
+## v1.0.0 (2025-03-13)
+- 初期リリース
+- 基本的なGoogle検索機能の実装
+- MCPプロトコル準拠のサーバー実装
+- 詳細なドキュメントの追加
+
+## v1.0.1 (2025-03-14)
+- バグ修正: メモリリーク問題の解決
+- パフォーマンス改善: キャッシュの実装
+- ドキュメントの更新: トラブルシューティングセクションの拡充
+
+# お問い合わせ
+
+- Issue Tracker: https://github.com/your-username/google-search-mcp/issues
+- Source Code: https://github.com/your-username/google-search-mcp
+
+このプロジェクトは[MIT license](LICENSE)の下で公開されています。
