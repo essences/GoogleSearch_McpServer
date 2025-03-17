@@ -1,37 +1,32 @@
 {
-  "name": "google-search-mcp",
-  "version": "0.1.0",
-  "description": "MCP server for Google search and webpage analysis",
+  "name": "google-search-mcp-server",
+  "version": "1.0.0",
   "type": "module",
-  "main": "build/google-search.js",
-  "bin": {
-    "google-search-mcp": "./build/google-search.js"
-  },
-  "files": [
-    "build"
-  ],
   "scripts": {
-    "build": "tsc && chmod +x dist/google-search.js",
-    "start": "node dist/google-search.js",
-    "dev": "tsc -w",
-    "start:python": "concurrently \"python3 google_search.py\" \"python3 link_view.py\"",
-    "start:all": "concurrently \"npm run start:python\" \"npm run start\""
+    "build": "tsc && chmod +x build/google-search-unified.js",
+    "start": "node build/google-search-unified.js",
+    "dev": "npm run build && npm start"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.7.0",
-    "axios": "^1.8.2",
+    "@modelcontextprotocol/sdk": "^1.5.0",
+    "@types/axios": "^0.9.36",
+    "@types/jsdom": "^21.1.7",
+    "axios": "^1.8.3",
     "cheerio": "^1.0.0",
-    "dompurify": "^3.2.3",
-    "express": "^4.21.2",
-    "googleapis": "^144.0.0",
-    "jsdom": "^25.0.1"
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "googleapis": "^128.0.0",
+    "jsdom": "^26.0.0"
   },
   "devDependencies": {
-    "@types/dompurify": "^3.0.5",
+    "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "@types/jsdom": "^21.1.6",
     "@types/node": "^20.17.24",
-    "concurrently": "^9.1.0",
-    "typescript": "^5.7.2"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
+  },
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifiers": true
   }
 }
