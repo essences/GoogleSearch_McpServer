@@ -1,5 +1,4 @@
 import { google } from 'googleapis';
-import fs from 'fs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
@@ -51,19 +50,17 @@ class GoogleSearchServer {
             this.apiKey = process.env.GOOGLE_API_KEY || '';
             this.searchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID || '';
             if (!this.apiKey || !this.searchEngineId) {
-                const config = JSON.parse(fs.readFileSync('api-keys.json', 'utf-8'));
-                this.apiKey = config.api_key;
-                this.searchEngineId = config.search_engine_id;
-            }
-            if (!this.apiKey || !this.searchEngineId) {
-                throw new Error('Missing API credentials');
+                throw new McpError(ErrorCode.InternalError, '環境変数 GOOGLE_API_KEY と GOOGLE_SEARCH_ENGINE_ID が必要です。設定ファイルで指定してください。');
             }
             this.initializeGoogleSearch();
         }
         catch (err) {
+            if (err instanceof McpError) {
+                throw err;
+            }
             const error = err;
             console.error('Failed to load settings:', error.message);
-            throw error;
+            throw new McpError(ErrorCode.InternalError, '設定の読み込みに失敗しました: ' + error.message);
         }
     }
     initializeGoogleSearch() {
